@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>主大永清晨箴言投影</title>
+    <link rel="icon" type="image/png" href="predawn-icon.png">
+    <style>
+        :root { --primary: #007bff; --success: #28a745; --bg-gray: #f1f3f5; }
+        body { font-family: "Microsoft JhengHei", sans-serif; margin: 0; background: var(--bg-gray); height: 100vh; display: flex; justify-content: center; overflow: hidden; }
+        .admin-container { display: flex; gap: 0px; width: 100%; height: 100vh; padding: 15px; box-sizing: border-box; }
+        
+        /* 💡 比例分配：左側與中間編輯區預設各佔 30% 寬度（共 60%），右側自動填滿 40% */
+        .editor-side { 
+            flex: 0 0 30%; 
+            min-width: 280px; 
+            background: white; 
+            padding: 25px; 
+            border-radius: 15px 0 0 15px; 
+            box-shadow: -4px 4px 15px rgba(0,0,0,0.05); 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+        }
+        .story-side { 
+            flex: 0 0 30%; 
+            min-width: 280px;
+            background: #fdfffe; 
+            padding: 25px; 
+            border-left: 1px solid #dee2e6; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+        }
+        .scroll-content { flex-grow: 1; overflow-y: auto; padding-right: 10px; display: flex; flex-direction: column; height: 100%; }
+        
+        /* 💡 左右各有一條無級拖曳拉桿 */
+        .resizer { 
+            flex: 0 0 8px; 
+            background: #e9ecef; 
+            cursor: col-resize; 
+            transition: background 0.2s;
+            position: relative;
+            z-index: 5;
+        }
+        .resizer:hover, .resizer.resizing { 
+            background: var(--primary); 
+        }
+
+        /* 💡 右側自動填滿剩餘的 40% 空間 */
+        .nav-side { flex: 1; min-width: 300px; background: #343a40; padding: 20px; border-radius: 0 15px 15px 0; color: white; overflow-y: auto; display: flex; flex-direction: column; }
+        
+        /* 💡 右側頂部排版 */
+        .nav-header { display: flex; align-items: center; width: 100%; margin-bottom: 12px; gap: 8px; }
+        .nav-hint { font-size: 14px; color: #b2b9bf; line-height: 1.2; white-space: nowrap; }
+        
+        /* 💡 啟動按鈕 */
+        .btn-launch-projector {
+            background: var(--success);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 14px; 
+            flex-grow: 1; 
+            font-size: 15px; 
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            white-space: nowrap;
+            box-shadow: 0 3px 8px rgba(40, 167, 69, 0.3);
+            text-align: center;
+            letter-spacing: 0.5px;
+        }
+        .btn-launch-projector:hover {
+            background: #218838;
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.5);
+        }
+
+        /* 💡 精緻 (i) 懸浮提示樣式 */
+        .tooltip-container {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+        }
+        .info-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 13px;
+            font-weight: bold;
+            font-family: serif;
+            transition: 0.2s;
+        }
+        .tooltip-container:hover .info-icon {
+            border-color: rgba(255, 255, 255, 0.9);
+            color: rgba(255, 255, 255, 1);
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .tooltip-text {
+            visibility: hidden;
+            width: 175px; 
+            background-color: #212529;
+            color: #fff;
+            text-align: center; 
+            border-radius: 6px;
+            padding: 8px 10px;
+            position: absolute;
+            z-index: 100;
+            top: 125%; 
+            right: -2px; 
+            opacity: 0;
+            transition: opacity 0.2s;
+            font-size: 12px;
+            line-height: 1.5; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            border: 1px solid #495057;
+            pointer-events: none; 
+            white-space: normal; 
+        }
+        .tooltip-text::after {
+            content: "";
+            position: absolute;
+            bottom: 100%;
+            right: 8px;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: transparent transparent #212529 transparent;
+        }
+        .tooltip-container:hover .tooltip-text { visibility: visible; opacity: 1; }
+
+        .input-group { margin-bottom: 20px; }
+        
+        /* 💡 修正後：四角對齊頂部列 */
+        .four-corner-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center; /* 垂直置中 */
+            margin-bottom: 12px;
+            width: 100%;
+        }
+        .header-left-col {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        h2 { font-size: 18px; margin: 0; color: #333; border-left: 5px solid var(--primary); padding-left: 10px; white-space: nowrap; line-height: 1.2; }
+        .hint-text { font-size: 13px; color: #888; font-weight: normal; margin: 0; line-height: 1.2; white-space: nowrap; }
+
+        /* 💡 右側專屬：改用極扁的雙行 textarea，移除滾動條，讓輸入體驗跟 PPT 文本框一模一樣 */
+        .four-corner-header textarea {
+            width: 50%; /* 適度放寬橫向比例 */
+            height: 2.9lh; /* 👈 高度剛好容納漂亮的兩行字 */
+            min-height: 0 !important; /* 👈 關鍵！強制解除全域 min-height: 350px 的限制 */
+            flex-grow: 0 !important;  /* 👈 關鍵！防止它被 flex-grow 往下拉伸 */
+            background: #ffffff;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 13px;
+            color: #333333;
+            outline: none;
+            box-sizing: border-box;
+            font-family: "Microsoft JhengHei", sans-serif;
+            text-align: center; /* 文字水平置中 */
+            line-height: 1.25;
+            white-space: pre;     /* 👈 不自動折行，只跟著 Enter 換行 */
+            resize: none;         /* 👈 固定尺寸不提供拖曳抓角 */
+            overflow: auto;       /* 👈 平常無捲軸，內容超載時才按需顯示 */
+        }
+        
+        /* 橘色故事主題識別 */
+        .story-side h2 { border-left-color: #ff9f43; }
+
+        /* 💡 工具列樣式 */
+        .toolbar-container { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            gap: 4px; 
+            position: relative; 
+            margin-bottom: 8px; 
+            white-space: nowrap; 
+            width: 100%;
+        }
+
+        /* 💡 縮小按鈕尺寸 */
+        .btn-symbol { 
+            background: #e9ecef; 
+            border: 1px solid #ced4da; 
+            border-radius: 4px; 
+            padding: 4px 6px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            font-size: 12px; 
+            transition: 0.2s; 
+            white-space: nowrap; 
+            flex: 1; 
+            text-align: center;
+            min-width: 0; 
+            overflow: hidden;
+            text-overflow: ellipsis; 
+        }
+        .btn-symbol:hover { background: #dee2e6; }
+        
+        .btn-history { background: #fff3cd; border-color: #ffeba2; color: #856404; }
+        .btn-history:hover { background: #ffe8a1; }
+        .btn-history:disabled { background: #e2e3e5; border-color: #d6d8db; color: #383d41; cursor: not-allowed; opacity: 0.6; }
+
+        .story-side .btn-history { background: #e3f2fd; border-color: #bbdefb; color: #0d47a1; }
+        .story-side .btn-history:hover { background: #cbdff7; }
+        .story-side .btn-history:disabled { background: #e2e3e5; border-color: #d6d8db; color: #383d41; cursor: not-allowed; opacity: 0.6; }
+
+        .history-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr; 
+            gap: 6px;
+            margin-bottom: 8px;
+            width: 100%;
+        }
+        .history-row .btn-history { width: 100%; padding: 6px; font-size: 13px; }
+
+        .dropdown { position: relative; display: inline-block; flex: 1; min-width: 0; }
+        .dropdown .btn-symbol { width: 100%; }
+        .dropdown-content { 
+            display: none; flex-direction: column; position: absolute; right: 0; top: 100%; background-color: white; 
+            width: 100%; box-shadow: 0px 8px 16px rgba(0,0,0,0.15); border-radius: 6px; z-index: 10; border: 1px solid #ddd; margin-top: 4px; padding: 4px 0;
+        }
+        .dropdown-content button { 
+            background: none; border: none; color: #333; padding: 10px 12px; text-align: center; width: 100%; 
+            font-size: 13px; cursor: pointer; font-weight: normal; border-radius: 0; white-space: nowrap; box-sizing: border-box;
+        }
+        .dropdown-content button:hover { background-color: #f1f3f5; }
+        .dropdown.show .dropdown-content { display: flex; }
+
+        textarea { width: 100%; flex-grow: 1; min-height: 350px; padding: 12px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 15px; line-height: 1.35; font-family: "Microsoft JhengHei", monospace; resize: none; }
+        
+        .nav-controls { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1.2fr; gap: 8px; margin-bottom: 15px; }
+        .btn-nav-ctrl { padding: 12px; font-size: 15px; background: #495057; border: 1px solid #6c757d; color: white; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-nav-ctrl:hover:not(:disabled) { background: #6c757d; border-color: #fff; }
+        .btn-nav-ctrl:disabled { background: #2b3035; color: #6c757d; border-color: #343a40; cursor: not-allowed; }
+
+        /* 💡 夢幻紫色版：Available 時亮紫，Hover 轉深紫 */
+        #btnPrevPage:not(:disabled), 
+        #btnNextPage:not(:disabled) {
+            background: #a55eea;
+            border-color: #8854d0;
+            color: #ffffff;
+            box-shadow: 0 2px 6px rgba(165, 94, 234, 0.3);
+        }
+
+        #btnPrevPage:hover:not(:disabled), 
+        #btnNextPage:hover:not(:disabled) {
+            background: #8854d0;
+            border-color: #3867d6;
+        }
+
+        #navList { flex-grow: 1; overflow-y: auto; }
+        .nav-item { background: #495057; padding: 14px 16px; margin-bottom: 10px; border-radius: 6px; cursor: pointer; border: 1px solid #6c757d; transition: 0.15s; outline: none !important; box-shadow: none !important; }
+        .nav-item.active { background: var(--primary); border-color: #fff; }
+        
+        .nav-item .preview { font-size: 16px; color: #ced4da; line-height: 1.5; white-space: pre-wrap; display: block; word-break: break-all; }
+        .nav-item.active .preview { color: #fff; }
+
+        /* --- 💡 投影窗核心樣式 --- */
+        #projector-root { 
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+            aspect-ratio: 16 / 9; width: 100vw; max-height: 100vh; 
+            background: #000; display: flex; justify-content: center; align-items: center; overflow: hidden; z-index: 1; 
+        }
+        
+        .slide { 
+            width: 100%; height: 100%; background-size: cover; background-position: center; 
+            display: flex; flex-direction: column; box-sizing: border-box; position: relative; 
+            container-type: inline-size; 
+        }
+        
+        .layout-top-left { justify-content: flex-start; align-items: flex-start; text-align: left; padding: 0.9cqw 0 0 3.5cqw; }
+        
+        /* 💡 封面頁專屬：頂部推擠 */
+        .layout-section-cover { 
+            justify-content: flex-start; 
+            align-items: center; 
+            text-align: center; 
+            padding-top: 3cqw; 
+            font-family: "微軟正黑體", "Microsoft JhengHei UI", "Microsoft JhengHei", "PMingLiU", sans-serif;
+        } 
+        
+        .font-weibei { font-family: "華康魏碑體(P)", "DFPWeiBei-B5", "DFWeiBei-B5", "華康魏碑體", serif; color: #000000; }
+        
+        .proverb-box { 
+            line-height: 1.25; 
+            word-break: break-all; 
+            width: 100%; 
+            margin-right: -2.5cqw; 
+            line-break: strict; 
+            hanging-punctuation: last allow-end;
+        }
+
+        /* 💡 極致顯色濃郁版：暖橘金光暈（不透明度調高至 0.85/0.8） + PPT 45度黑色陰影 + 2.6cqw右挪 */
+        .cover-glow-text {
+            font-size: 5cqw;
+            font-weight: bold;
+            color: #ffffff;
+            line-height: 1.2;
+            letter-spacing: 0.1cqw;
+            padding-left: 2.6cqw; /* 👈 保持你最完美的 2.6cqw 右移 */
+            /* 🌟 終極調配：
+              - 將前兩層核心光暈的 Alpha 值直接拉高到 0.85 與 0.8，讓字體邊緣的橘光濃郁到極致！
+              - 後兩層外圍光暈維持 0.75 與 0.65，確保大範圍擴散時依然有漂亮的晨曦漸層感。
+            */
+            text-shadow: 0 0 0.4cqw rgba(212, 137, 58, 0.9),
+                         0 0 1.0cqw rgba(212, 137, 58, 0.85),
+                         0 0 1.8cqw rgba(212, 137, 58, 0.8),
+                         0 0 2.2cqw rgba(212, 137, 58, 0.7),
+                         0.28cqw 0.28cqw 0.5cqw rgba(0, 0, 0, 0.4); /* PPT 45°角右下黑色偏置陰影 */
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        gap {
+            display: block;
+            height: 0;
+            line-height: 0 !important;
+            margin-top: -3cqw !important;
+            padding: 0 !important;
+        }
+
+        #fs-toggle-btn { 
+            position: fixed; bottom: 10px; left: 10px; width: 40px; height: 40px; 
+            background: transparent; border: none; cursor: pointer; z-index: 99999; 
+            display: flex; align-items: center; justify-content: center; 
+            color: rgba(255, 255, 255, 0.2); font-size: 20px; transition: 0.3s; 
+        }
+        #fs-toggle-btn:hover { color: rgba(255, 255, 255, 0.6); }
+
+        .projector-mode-body { background: #000000 !important; }
+    </style>
+</head>
+<body>
+
+<div id="controller-root" class="admin-container">
+    <!-- 1. 左側：箴言輸入區 -->
+    <div class="editor-side" id="editorSide">
+        <div class="scroll-content">
+            <div class="input-group" style="flex-grow: 1; display: flex; flex-direction: column; margin-bottom: 0px; height: 100%;">
+                
+                <!-- 🌟 箴言區頂部：左右極簡並排版 -->
+                <div class="four-corner-header">
+                    <div class="header-left-col">
+                        <h2>箴言內容</h2>
+                        <div class="hint-text">以空白行來分頁、分箴言</div>
+                    </div>
+                    <textarea id="proverbCoverInput" oninput="autoSync()">2026年X月XX日
+週Ｏ清晨箴言</textarea>
+                </div>
+
+                <!-- 💡 箴言區：給它專屬的 id="moreDropdown" -->
+                <div class="toolbar-container">
+                    <button id="btnUndo" class="btn-symbol btn-history" onclick="undo()" title="復原 (Ctrl+Z)" style="flex: 0.6;" disabled>↩ 復原</button>
+                    <button id="btnRedo" class="btn-symbol btn-history" onclick="redo()" title="重做 (Ctrl+Y)" style="flex: 0.6;" disabled>↪ 重做</button>
+                    <button class="btn-symbol" onclick="insertSymbol('<gap></gap>')" title="半空行分段" style="flex: 1.0;">同頁分段空行</button>
+                    <div class="dropdown" id="moreDropdown">
+                        <button class="btn-symbol" onclick="toggleDropdown(event, 'moreDropdown')">✨ 其他功能 ▾</button>
+                        <div class="dropdown-content">
+                            <button onclick="insertSymbol('↓')">↓ 續下一頁</button>
+                            <button onclick="insertSymbol('&amp;emsp;')">&emsp;神全形空格</button>
+                            <button onclick="insertSymbol('<b>', '</b>')"><b>粗體</b></button>
+                            <button onclick="insertSymbol('<u>', '</u>')"><u>底線</u></button>
+                        </div>
+                    </div>
+                </div>
+
+                <textarea id="proverbInput" oninput="handleInput()" placeholder="請貼上箴言..." style="flex-grow: 1;"></textarea>
+            </div>
+        </div>
+    </div>
+    
+    <div class="resizer" id="dragSplitterL"></div>
+    
+    <!-- 2. 中間：聖靈話語輸入區 -->
+    <div class="story-side" id="storySide">
+        <div class="scroll-content">
+            <div class="input-group" style="flex-grow: 1; display: flex; flex-direction: column; margin-bottom: 0px; height: 100%;">
+                
+                <!-- 🌟 故事區頂部：左右極簡並排版 -->
+                <div class="four-corner-header">
+                    <div class="header-left-col">
+                        <h2>聖靈話語內容</h2>
+                        <div class="hint-text">每一頁開頭將自動空一行</div>
+                    </div>
+                    <textarea id="storyCoverInput" oninput="autoSync()">2026年聖靈話語XXX
+(20260077)</textarea>
+                </div>
+
+                <!-- 💡 故事區：給它專屬的 id="storyDropdown" -->
+                <div class="toolbar-container">
+                    <button id="btnStoryUndo" class="btn-symbol btn-history" onclick="storyUndo()" title="復原 (Ctrl+Z)" style="flex: 0.6;" disabled>↩ 復原</button>
+                    <button id="btnStoryRedo" class="btn-symbol btn-history" onclick="storyRedo()" title="重做 (Ctrl+Y)" style="flex: 0.6;" disabled>↪ 重做</button>
+                    <button class="btn-symbol" onclick="insertSymbolToStory('<gap></gap>')" title="故事內半空行分段" style="flex: 1.0;">同頁分段空行</button>
+                    <div class="dropdown" id="storyDropdown">
+                        <button class="btn-symbol" onclick="toggleDropdown(event, 'storyDropdown')">✨ 其他功能 ▾</button>
+                        <div class="dropdown-content">
+                            <button onclick="insertSymbolToStory('&amp;emsp;')">&emsp;神全形空格</button>
+                            <button onclick="insertSymbolToStory('<b>', '</b>')"><b>粗體</b></button>
+                            <button onclick="insertSymbolToStory('<u>', '</u>')"><u>底線</u></button>
+                        </div>
+                    </div>
+                </div>
+
+                <textarea id="storyInput" oninput="handleStoryInput()" placeholder="請貼上聖靈話語內容..." style="flex-grow: 1;"></textarea>
+            </div>
+        </div>
+    </div>
+    
+    <div class="resizer" id="dragSplitterR"></div>
+    
+    <!-- 3. 右側：投影控制區 -->
+    <div class="nav-side" id="navSide">
+        <div class="nav-header">
+            <button class="btn-launch-projector" onclick="openProjectorWithTip()">啟動投影視窗 ⛶</button>
+            
+            <div class="tooltip-container">
+                <div class="info-icon">i</div>
+                <div class="tooltip-text">
+                    全螢幕按鈕<br>隱藏在投影視窗「左下角」<br>或 鍵盤 F11
+                </div>
+            </div>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <span class="nav-hint">※ 可用鍵盤上下左右鍵</span>
+            <span class="nav-hint" id="sizeDisplay" style="font-weight: bold; background: #495057; padding: 4px 8px; border-radius: 4px;">字級: 5</span>
+        </div>
+        
+        <div class="nav-controls">
+            <button id="btnPrevPage" class="btn-nav-ctrl" onclick="pagePrev()">◀ 上頁</button>
+            <button class="btn-nav-ctrl btn-zoom-ctrl" onclick="adjustFontSize(-0.4)" title="縮小投影字體">A －</button>
+            <button class="btn-nav-ctrl btn-zoom-ctrl" onclick="adjustFontSize(0.4)" title="放大投影字體">A ＋</button>
+            <button id="btnNextPage" class="btn-nav-ctrl" onclick="pageNext()">下頁 ▶</button>
+        </div>
+        
+        <div id="navList"></div>
+    </div>
+</div>
+
+<script>
+    const channel = new BroadcastChannel('morning_worship');
+    const proverbTextarea = document.getElementById('proverbInput');
+    const storyTextarea = document.getElementById('storyInput');
+    const proverbCoverInput = document.getElementById('proverbCoverInput');
+    const storyCoverInput = document.getElementById('storyCoverInput');
+
+    // 💡 監聽輸入即時存檔並大腦同步
+    proverbCoverInput.addEventListener('input', autoSync);
+    storyCoverInput.addEventListener('input', autoSync);
+
+    // 💡 讀取舊有快照 & 自動存檔
+    setTimeout(() => {
+        const savedProverb = localStorage.getItem('saved_proverb');
+        const savedStory = localStorage.getItem('saved_story') || "";
+        const savedProvCover = localStorage.getItem('saved_prov_cover');
+        const savedStoryCover = localStorage.getItem('saved_story_cover');
+        
+        if (savedProverb !== null) {
+            proverbTextarea.value = savedProverb;
+            undoStack = [savedProverb];
+        }
+        storyTextarea.value = savedStory;
+        storyUndoStack = [savedStory];
+
+        if (savedProvCover) proverbCoverInput.value = savedProvCover;
+        if (savedStoryCover) storyCoverInput.value = savedStoryCover;
+        
+        if (typeof syncSlides === 'function') {
+            syncSlides(false);
+        }
+    }, 50);
+
+    let slides = [];
+    let curIdx = 0;
+    let syncTimer;
+    let globalFontSize = 5;
+
+    let undoStack = [""], redoStack = [];
+    let storyUndoStack = [""], storyRedoStack = [];
+    const maxHistory = 50;
+
+    // 拉桿拖動
+    const splitterL = document.getElementById('dragSplitterL');
+    const splitterR = document.getElementById('dragSplitterR');
+    const elEditor = document.getElementById('editorSide');
+    const elStory = document.getElementById('storySide');
+    const containerRoot = document.getElementById('controller-root');
+
+    if (splitterL && splitterR) {
+        splitterL.addEventListener('mousedown', function(e) {
+            e.preventDefault(); document.addEventListener('mousemove', resizeHandlerL); document.addEventListener('mouseup', stopResizeHandlerL);
+        });
+        splitterR.addEventListener('mousedown', function(e) {
+            e.preventDefault(); document.addEventListener('mousemove', resizeHandlerR); document.addEventListener('mouseup', stopResizeHandlerR);
+        });
+    }
+
+    function resizeHandlerL(e) {
+        let percentage = (e.clientX / containerRoot.clientWidth) * 100;
+        if (percentage < 20) percentage = 20; if (percentage > 50) percentage = 50;
+        elEditor.style.flex = `0 0 ${percentage}%`;
+    }
+    function stopResizeHandlerL() { document.removeEventListener('mousemove', resizeHandlerL); }
+
+    function resizeHandlerR(e) {
+        const editorWidth = elEditor.getBoundingClientRect().width;
+        let storyPercentage = ((e.clientX / containerRoot.clientWidth) * 100) - ((editorWidth / containerRoot.clientWidth) * 100);
+        if (storyPercentage < 20) storyPercentage = 20; if (storyPercentage > 50) storyPercentage = 50;
+        elStory.style.flex = `0 0 ${storyPercentage}%`;
+    }
+    function stopResizeHandlerR() { document.removeEventListener('mousemove', resizeHandlerR); }
+
+    // 💡 透過傳入的 ID 字串，精準控制哪一個選單要打開
+    function toggleDropdown(e, dropdownId) { 
+        e.stopPropagation(); 
+        const target = document.getElementById(dropdownId);
+        
+        // 關掉另外一個，避免兩個選單同時打開
+        document.querySelectorAll('.dropdown').forEach(dd => {
+            if(dd !== target) dd.classList.remove('show');
+        });
+        
+        // 切換自己的顯示狀態
+        if(target) target.classList.toggle('show'); 
+    }
+    
+    // 點擊外面時全部收起來
+    window.addEventListener('click', () => { 
+        const dd1 = document.getElementById('moreDropdown');
+        const dd2 = document.getElementById('storyDropdown');
+        if(dd1) dd1.classList.remove('show');
+        if(dd2) dd2.classList.remove('show');
+    });
+
+    function saveState(state) {
+        if (undoStack[undoStack.length - 1] === state) return;
+        undoStack.push(state); if (undoStack.length > maxHistory) undoStack.shift();
+        redoStack = []; updateHistoryButtons(); localStorage.setItem('saved_proverb', state);
+    }
+    function handleInput() { saveState(proverbTextarea.value); autoSync(); }
+
+    function undo() {
+        if (undoStack.length > 1) {
+            redoStack.push(undoStack.pop()); proverbTextarea.value = undoStack[undoStack.length - 1];
+            updateHistoryButtons(); autoSync();
+        }
+    }
+    function redo() {
+        if (redoStack.length > 0) {
+            undoStack.push(redoStack.pop()); proverbTextarea.value = undoStack[undoStack.length - 1];
+            updateHistoryButtons(); autoSync();
+        }
+    }
+    function updateHistoryButtons() {
+        document.getElementById('btnUndo').disabled = (undoStack.length <= 1);
+        document.getElementById('btnRedo').disabled = (redoStack.length === 0);
+    }
+
+    function saveStoryState(state) {
+        if (storyUndoStack[storyUndoStack.length - 1] === state) return;
+        storyUndoStack.push(state); if (storyUndoStack.length > maxHistory) storyUndoStack.shift();
+        storyRedoStack = []; updateStoryHistoryButtons(); localStorage.setItem('saved_story', state);
+    }
+    function handleStoryInput() { saveStoryState(storyTextarea.value); autoSync(); }
+
+    function storyUndo() {
+        if (storyUndoStack.length > 1) {
+            storyRedoStack.push(storyUndoStack.pop()); storyTextarea.value = storyUndoStack[storyUndoStack.length - 1];
+            updateStoryHistoryButtons(); autoSync();
+        }
+    }
+    function storyRedo() {
+        if (storyRedoStack.length > 0) {
+            storyUndoStack.push(storyRedoStack.pop()); storyTextarea.value = storyUndoStack[storyUndoStack.length - 1];
+            updateStoryHistoryButtons(); autoSync();
+        }
+    }
+    function updateStoryHistoryButtons() {
+        document.getElementById('btnStoryUndo').disabled = (storyUndoStack.length <= 1);
+        document.getElementById('btnStoryRedo').disabled = (storyRedoStack.length === 0);
+    }
+
+    document.addEventListener('keydown', e => {
+        const modifier = navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? e.metaKey : e.ctrlKey;
+        if (modifier && e.key.toLowerCase() === 'z') {
+            e.preventDefault();
+            if (document.activeElement === proverbTextarea) { if (e.shiftKey) redo(); else undo(); }
+            else if (document.activeElement === storyTextarea) { if (e.shiftKey) storyRedo(); else storyUndo(); }
+        } else if (modifier && e.key.toLowerCase() === 'y') {
+            e.preventDefault();
+            if (document.activeElement === proverbTextarea) redo();
+            else if (document.activeElement === storyTextarea) storyRedo();
+        }
+    });
+
+    // 💡 箴言區：鎖定游標與捲軸位置
+    function insertSymbol(symbolStart, symbolEnd = "") {
+        const start = proverbTextarea.selectionStart;
+        const end = proverbTextarea.selectionEnd;
+        const text = proverbTextarea.value;
+        
+        // 🌟 1. 記錄當前的捲動高度
+        const currentScrollTop = proverbTextarea.scrollTop;
+        
+        const insertedText = symbolStart + text.substring(start, end) + symbolEnd;
+        const newText = text.substring(0, start) + insertedText + text.substring(end);
+        
+        proverbTextarea.value = newText;
+        
+        // 🌟 2. 設定游標位置
+        const newCursorPos = start + insertedText.length;
+        proverbTextarea.focus();
+        proverbTextarea.setSelectionRange(newCursorPos, newCursorPos);
+        
+        // 🌟 3. 強制把捲軸拉回原本的高度
+        proverbTextarea.scrollTop = currentScrollTop;
+        
+        saveState(newText);
+        autoSync();
+    }
+
+    // 💡 聖靈話語區：鎖定游標與捲軸位置
+    function insertSymbolToStory(symbolStart, symbolEnd = "") {
+        const start = storyTextarea.selectionStart;
+        const end = storyTextarea.selectionEnd;
+        const text = storyTextarea.value;
+        
+        // 🌟 1. 記錄當前的捲動高度
+        const currentScrollTop = storyTextarea.scrollTop;
+        
+        const insertedText = symbolStart + text.substring(start, end) + symbolEnd;
+        const newText = text.substring(0, start) + insertedText + text.substring(end);
+        
+        storyTextarea.value = newText;
+        
+        // 🌟 2. 設定游標位置
+        const newCursorPos = start + insertedText.length;
+        storyTextarea.focus();
+        storyTextarea.setSelectionRange(newCursorPos, newCursorPos);
+        
+        // 🌟 3. 強制把捲軸拉回原本的高度
+        storyTextarea.scrollTop = currentScrollTop;
+        
+        saveStoryState(newText);
+        autoSync();
+    }
+
+    function autoSync() {
+        localStorage.setItem('saved_prov_cover', proverbCoverInput.value);
+        localStorage.setItem('saved_story_cover', storyCoverInput.value);
+        clearTimeout(syncTimer); syncTimer = setTimeout(() => { syncSlides(true); }, 250);
+    }
+
+    // 🌟 智慧分割大腦：精確自動切雙行（抓第一個空格或左括號）
+    function smartSplitToTwoLines(text) {
+        let clean = text.trim();
+        if (!clean) return "";
+        
+        // 1. 優先抓半形空格
+        if (clean.includes(" ")) {
+            let idx = clean.indexOf(" ");
+            return clean.substring(0, idx) + "<br>" + clean.substring(idx + 1).trim();
+        }
+        
+        // 2. 抓全形空格
+        if (clean.includes(" ")) {
+            let idx = clean.indexOf(" ");
+            return clean.substring(0, idx) + "<br>" + clean.substring(idx + 1).trim();
+        }
+
+        // 3. 專門抓括號
+        if (clean.includes("(")) {
+            let idx = clean.indexOf("(");
+            return clean.substring(0, idx).trim() + "<br>" + clean.substring(idx).trim();
+        }
+
+        return clean;
+    }
+
+    // 💡 大腦解析器：雙核過門封面頁動態流
+    function parseData() {
+        let res = [];
+        
+        // 🌟 1. 箴言過門封面頁
+        const provCoverText = proverbCoverInput.value.trim().replace(/\n/g, '<br>');
+        if (provCoverText !== "") {
+            res.push({
+                preview: `[封面]✏️ ${proverbCoverInput.value.replace(/\n/g, ' ')}`,
+                bg: 'images/predawn_bg3.jpg', font: 'sans-serif', layout: 'section-cover',
+                isStory: false, isCover: true,
+                html: `<div class="cover-glow-text">${provCoverText}</div>`
+            });
+        }
+
+        // 箴言內容頁
+        const rawProverb = proverbTextarea.value;
+        const provSegments = rawProverb.split(/\n\s*\n/).filter(s => s.trim() !== "");
+        provSegments.forEach((seg) => {
+            const linesArray = seg.trim().split('\n');
+            const formattedSeg = seg.trim().replace(/\n/g, '<br>');
+            const cleanPreview = seg.trim().replace(/\n/g, ' ').replace(/<\/?br>/gi, ' ').replace(/<gap><\/gap>/g, '<br>');
+
+            let maxLineChars = 0; linesArray.forEach(l => { if (l.length > maxLineChars) maxLineChars = l.length; });
+            let autoSpacingValue = maxLineChars === 19 ? -0.07 : (maxLineChars === 20 ? -0.14 : (maxLineChars >= 21 ? -0.18 : 0));
+
+            res.push({ 
+                preview: cleanPreview, bg: 'images/predawn_content.jpg', font: 'weibei', layout: 'top-left', isStory: false,
+                html: `<div class="proverb-box" style="font-size: ${globalFontSize}cqw; letter-spacing: ${autoSpacingValue}cqw;">${formattedSeg}</div>` 
+            });
+        });
+
+        // 🌟 2. 聖靈話語過門封面頁
+        const storyCoverText = storyCoverInput.value.trim().replace(/\n/g, '<br>');
+        if (storyCoverText !== "") {
+            res.push({
+                preview: `[封面]✏️ ${storyCoverInput.value.replace(/\n/g, ' ')}`,
+                bg: 'images/predawn_bg3.jpg', font: 'sans-serif', layout: 'section-cover',
+                isStory: true, isCover: true,
+                html: `<div class="cover-glow-text">${storyCoverText}</div>`
+            });
+        }
+
+        // 聖靈話語內容頁
+        const rawStory = storyTextarea.value;
+        const storySegments = rawStory.split(/\n\s*\n/).filter(s => s.trim() !== "");
+        storySegments.forEach((seg) => {
+            // 💡 拿掉整行 '\n'，改用高度精確的微墊高區塊
+            const formattedSeg = `<div style="height: 4.7cqw;"></div>` + seg.trim().replace(/\n/g, '<br>');
+            const linesArray = seg.trim().split('\n');
+            const cleanPreview = seg.trim().replace(/\n/g, ' ').replace(/<\/?br>/gi, ' ').replace(/<gap><\/gap>/g, '<br>');
+
+            let maxLineChars = 0; linesArray.forEach(l => { if (l.length > maxLineChars) maxLineChars = l.length; });
+            let autoSpacingValue = maxLineChars === 19 ? -0.07 : (maxLineChars === 20 ? -0.14 : (maxLineChars >= 21 ? -0.18 : 0));
+
+            res.push({ 
+                preview: cleanPreview, bg: 'images/predawn_content.jpg', font: 'weibei', layout: 'top-left', isStory: true,
+                html: `<div class="proverb-box" style="font-size: ${globalFontSize}cqw; letter-spacing: ${autoSpacingValue}cqw;">${formattedSeg}</div>` 
+            });
+        });
+
+        return res;
+    }
+
+    function syncSlides(keepIndex = false) {
+        slides = parseData(); renderNav();
+        if (!keepIndex) curIdx = 0;
+        jumpTo(curIdx);
+    }
+
+    function renderNav() {
+        const container = document.getElementById('navList'); container.innerHTML = '';
+        slides.forEach((s, index) => {
+            const div = document.createElement('div');
+            div.className = `nav-item ${index === curIdx ? 'active' : ''}`;
+            div.id = `nav-${index}`; div.onclick = () => jumpTo(index);
+            
+            if (s.isCover) {
+                div.style.borderLeft = '5px solid #00f5ff'; 
+            } else if (s.isStory) {
+                div.style.borderLeft = '5px solid #ff9f43'; 
+            }
+            
+            div.innerHTML = `<span class="preview">${s.preview}</span>`;
+            container.appendChild(div);
+        });
+    }
+
+    function updateNavButtons() {
+        const prevBtn = document.getElementById('btnPrevPage'), nextBtn = document.getElementById('btnNextPage');
+        if (prevBtn && nextBtn) {
+            prevBtn.disabled = (curIdx <= 0 || slides.length === 0);
+            nextBtn.disabled = (curIdx >= slides.length - 1 || slides.length === 0);
+        }
+    }
+
+    function jumpTo(idx) {
+        if (idx >= slides.length) idx = slides.length - 1; if (idx < 0) idx = 0;
+        curIdx = idx;
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        const targetNav = document.getElementById(`nav-${idx}`);
+        if(targetNav) targetNav.classList.add('active');
+        updateNavButtons(); channel.postMessage({ action: 'sync', data: slides, index: curIdx });
+        if (targetNav) targetNav.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function pagePrev() { if (curIdx > 0) jumpTo(curIdx - 1); }
+    function pageNext() { if (curIdx < slides.length - 1) jumpTo(curIdx + 1); }
+
+    function adjustFontSize(amount) {
+        let newSize = globalFontSize + amount;
+        if (newSize >= 3 && newSize <= 10) {
+            globalFontSize = parseFloat(newSize.toFixed(1));
+            const disp = document.getElementById('sizeDisplay'); if (disp) disp.innerText = `字級: ${globalFontSize}`;
+            syncSlides(true);
+        }
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault();  
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') pageNext();
+        else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') pagePrev();
+        if (e.key === '+' || e.key === '=') adjustFontSize(0.4);
+        if (e.key === '-') adjustFontSize(-0.4);
+    });
+
+    function openProjectorWithTip() {
+        alert("💡 提醒：全螢幕按鈕，隱藏在投影視窗<左下角>，或使用鍵盤 F11 鍵");
+        window.open(window.location.href + '?mode=projector', 'Projector', 'width=854,height=480');
+        setTimeout(() => syncSlides(false), 800);
+    }
+
+    if (window.location.search.includes('mode=projector')) {
+        document.body.classList.add('projector-mode-body');
+        document.body.innerHTML = `<div id="projector-root"></div><button id="fs-toggle-btn" title="切換全螢幕">⛶</button>`;
+        const root = document.getElementById('projector-root');
+        const fsBtn = document.getElementById('fs-toggle-btn');
+        let localSlides = [];
+        
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') channel.postMessage({ action: 'next' });
+            else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') channel.postMessage({ action: 'prev' });
+            if (e.key === '+' || e.key === '=') channel.postMessage({ action: 'zoom', amount: 0.4 });
+            if (e.key === '-') channel.postMessage({ action: 'zoom', amount: -0.4 });
+        });
+
+        channel.onmessage = (e) => {
+            if (e.data.action === 'sync') { 
+                localSlides = e.data.data; curIdx = e.data.index;
+                const s = localSlides[curIdx];
+                if(s) {
+                    root.innerHTML = `<div class="slide font-${s.font} layout-${s.layout}" style="background-image:url('${s.bg}')">${s.html}</div>`;
+                }
+            }
+        };
+        fsBtn.onclick = () => {
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else if (document.exitFullscreen) document.exitFullscreen();
+        };
+    } else {
+        channel.onmessage = (e) => {
+            if (e.data.action === 'next' && curIdx < slides.length - 1) jumpTo(curIdx + 1);
+            if (e.data.action === 'prev' && curIdx > 0) jumpTo(curIdx - 1);
+            if (e.data.action === 'zoom') adjustFontSize(e.data.amount);
+        };
+    }
+</script>
+</body>
+</html>
